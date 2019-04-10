@@ -1,4 +1,4 @@
-# as-add-space-elevator
+# Add Space Elevator
 AstroSynthesis plugin for adding space elevators
 
 This plugin is available as a right click popmenu option. It adds a 
