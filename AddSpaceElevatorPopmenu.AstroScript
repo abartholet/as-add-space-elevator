@@ -1,0 +1,140 @@
+#popmenu    Add Space Elevator
+#author     Alan Bartholet
+#desc       Added a space elevator (mega structure) in geostationary orbit around a planet
+
+'Version 1.2
+
+'Declare global variables
+Dim sFolder    'as string
+
+'*****************************************************************************************
+' To random select a preview image from a folder set sFolder to the path to the folder
+' eg:
+' sFolder = "C:\Documents and Settings\foobar\My Documents\My Pictures\Space Elevators\"
+
+' If you don't wish to use this option set sFolder to an empty string
+' eg:
+' sFolder = ""
+'*****************************************************************************************
+sFolder = ""
+
+'Load the sector
+sector = GetCurrentSector
+
+if not isNull(EditingBody) Then
+
+	'Only going to work with Terrestrial and Gas Giant bodies.
+	If EditingBody.TypeID = BODY_TYPE_TERRESTRIAL Or EditingBody.TypeID = BODY_TYPE_GASGIANT Then
+		AddSpaceElevator EditingBody, 1000, 100000
+	End If
+
+	'Update population, habitability, and other statistics.
+	EditingBody.UpdateRootBody()
+End if
+
+Sub AddSpaceElevator(EditingBody, minPop, maxPop)
+	'Declare variables
+	Dim spaceElevator    'as body
+	Dim fso              'as file system object
+	Dim folder, files, folderIdx
+	Dim fileNames        'as dictionary
+	Dim i                'as int
+
+
+	'Check for geostationary orbit
+	If EditingBody.GetGeostationary() = 0 Then
+		MsgBox "Planet has no rotation and thus no geostationary orbit."
+		Exit Sub
+	ElseIf EditingBody.GetGeostationary() = -1 Then
+		MsgBox "Geostationary orbit is outside planets hill sphere."
+		Exit Sub
+	Else
+		'Make the interface
+		w = NewDialogWindow()
+		w.SetPosition 10, 20, 230, 150
+		w.Centered = TRUE
+
+		l = w.AddLabel()
+		l.SetPosition 10, 10, 100, 24
+		l.Caption = "Minimum Population:"
+
+		minPopTextEdit = w.AddTextEdit()
+		minPopTextEdit.SetPosition 115, 8, 100, 24
+		If IsNumeric(minPop) Then
+			minPopTextEdit.Text = minPop
+		End If
+
+		l = w.AddLabel()
+		l.SetPosition 10, 45, 100, 24
+		l.Caption = "Maximum Population:"
+
+		maxPopTextEdit = w.AddTextEdit()
+		maxPopTextEdit.SetPosition 115, 43, 100, 24
+		If IsNumeric(maxPop) Then
+			maxPopTextEdit.Text = maxPop
+		End If
+
+		'Display the display
+		If w.ShowModal Then
+
+			'Validate the population
+			If Not IsNumeric(minPopTextEdit.Text) or Not IsNumeric(maxPopTextEdit.Text) Then
+				MsgBox "Population values must be numbers.",16
+				AddSpaceElevator EditingBody, minPop, maxPop
+				Exit Sub
+			End If
+
+			'Create the space elevator as a mega structure
+			spaceElevator = CreateBody("mega structure")
+
+			'Set Name
+			spaceElevator.Name = "Space Elevator"
+
+			'Add a population
+			Randomize
+			spaceElevator.Population = Int((maxPop-minPop+1)*Rnd+minPop)
+
+			'Set orbital distance
+			spaceElevator.Distance = Round(EditingBody.GetGeostationary())
+
+			'Create a list of all the file names in the directory defined as sFolder
+			Set fso = CreateObject("Scripting.FileSystemObject")
+			Set fileNames = CreateObject("Scripting.Dictionary")
+
+			'Check for custom image folder
+			If Len(sFolder) > 0 Then
+				'Make sure defined folder exists
+				If fso.FolderExists(sFolder) Then
+					Set folder = fso.GetFolder(sFolder)
+					Set files = folder.Files
+					i = 1
+					For each folderIdx In files
+						extension = fso.GetExtensionName(folderIdx)
+						If extension = "bmp" or extension = "jpg" or extension = "png" or extension = "jpeg" Then
+							fileNames.Add i, folderIdx.Name
+							i = i + 1
+						End If
+					Next
+
+					'Check for trailing back slash on sFolder path
+					If Right(sFolder, 1) <> "\" Then
+						sFolder = sFolder & "\"
+					End IF
+
+					If fileNames.Count > 0 Then
+						'Pick a random image
+						sector.SetPreviewImage spaceElevator, sFolder & fileNames.Item(RollDice(1,fileNames.Count,0))
+					Else
+						MsgBox "Folder """ & sFolder & """ Does not contain any valid images." & vbcrlf & "The default image will be used instead."
+					End If
+				Else
+					MsgBox "Folder """ & sFolder & """ Does not exist."
+				End If
+			End If
+
+			'Add the spaceElevator to the planet
+			EditingBody.AddChild(spaceElevator)
+			EditingBody.SortChildrenByDistance()
+		End If
+	End If
+End Sub
